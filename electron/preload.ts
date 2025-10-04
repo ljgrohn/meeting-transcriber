@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getDesktopSources: () => ipcRenderer.invoke('get-desktop-sources'),
   getDesktopStream: async (sourceId: string) => {
     try {
+      // Note: System audio capture has limitations on Windows
+      // This requires the source to have audio and may not work for all windows
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           mandatory: {
@@ -24,12 +26,37 @@ contextBridge.exposeInMainWorld('electronAPI', {
             chromeMediaSourceId: sourceId
           }
         } as any,
-        video: false
+        video: {
+          mandatory: {
+            chromeMediaSource: 'desktop',
+            chromeMediaSourceId: sourceId,
+            maxWidth: 1,
+            maxHeight: 1
+          }
+        } as any
       });
+
+      // Remove video track, keep only audio
+      const videoTracks = stream.getVideoTracks();
+      videoTracks.forEach(track => {
+        stream.removeTrack(track);
+        track.stop();
+      });
+
+      const audioTracks = stream.getAudioTracks();
+      if (audioTracks.length === 0) {
+        throw new Error('No audio available from this source. Note: System audio capture is limited on Windows.');
+      }
+
       return stream;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error getting desktop stream:', error);
-      throw error;
+      if (error.name === 'NotAllowedError') {
+        throw new Error('Screen recording permission denied.');
+      } else if (error.message.includes('audio')) {
+        throw new Error('System audio capture is not available for this source on Windows. Try using microphone recording instead.');
+      }
+      throw new Error('Failed to capture audio from this source. System audio has limitations on Windows.');
     }
   },
 

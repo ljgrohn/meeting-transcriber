@@ -235,6 +235,17 @@ const RecordingControls: React.FC = () => {
             Both
           </ToggleButton>
         </ToggleButtonGroup>
+
+        {/* Windows System Audio Warning */}
+        {(audioSource === 'system' || audioSource === 'both') && (
+          <Alert severity="info" sx={{ mt: 2 }}>
+            <Typography variant="caption">
+              <strong>Note:</strong> System audio capture has limitations on Windows.
+              Only full screen recording is supported. For best results, use microphone recording
+              or enable "Stereo Mix" in your Windows sound settings.
+            </Typography>
+          </Alert>
+        )}
       </Box>
 
       {/* Microphone Selection */}

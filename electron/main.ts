@@ -182,12 +182,22 @@ ipcMain.handle('open-transcript', async () => {
 // Desktop audio capture handlers
 ipcMain.handle('get-desktop-sources', async () => {
   try {
+    // On Windows, only use screen capture as window capture often fails
+    const types = process.platform === 'win32' ? ['screen'] : ['window', 'screen'];
+
     const sources = await desktopCapturer.getSources({
-      types: ['window', 'screen'],
+      types: types as any,
       fetchWindowIcons: true
     });
 
-    return sources.map(source => ({
+    // Filter out sources that might not be capturable
+    const capturableSources = sources.filter(source => {
+      // Exclude certain system windows that cannot be captured
+      const excludedNames = ['Task Switching', 'Windows Shell Experience Host', 'Program Manager'];
+      return !excludedNames.some(name => source.name.includes(name));
+    });
+
+    return capturableSources.map(source => ({
       id: source.id,
       name: source.name,
       thumbnail: source.thumbnail.toDataURL()
