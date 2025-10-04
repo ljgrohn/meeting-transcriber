@@ -12,14 +12,15 @@ import {
   Tab,
   Tabs,
   IconButton,
+  Grid,
 } from '@mui/material';
 import {
-  Mic as MicIcon,
-  Stop as StopIcon,
   Save as SaveIcon,
   FolderOpen as FolderOpenIcon,
   Settings as SettingsIcon,
+  GraphicEq as AudioIcon,
 } from '@mui/icons-material';
+import RecordingControls from './components/RecordingControls';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -44,8 +45,6 @@ function TabPanel(props: TabPanelProps) {
 
 function App() {
   const [tabValue, setTabValue] = useState(0);
-  const [isRecording, setIsRecording] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [transcript, setTranscript] = useState<string>('');
   const [summary, setSummary] = useState<string>('');
   const [error, setError] = useState<string>('');
@@ -61,9 +60,7 @@ function App() {
     // Listen for menu actions
     if (window.electronAPI) {
       window.electronAPI.onMenuAction((action) => {
-        if (action === 'new-recording') {
-          handleStartRecording();
-        } else if (action === 'open-transcript') {
+        if (action === 'open-transcript') {
           handleOpenTranscript();
         }
       });
@@ -86,24 +83,6 @@ function App() {
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
-  };
-
-  const handleStartRecording = () => {
-    setIsRecording(true);
-    setError('');
-    // Recording logic will be implemented later
-  };
-
-  const handleStopRecording = () => {
-    setIsRecording(false);
-    setIsProcessing(true);
-    // Stop recording and process audio
-    // This will be implemented with the audio recording module
-    setTimeout(() => {
-      setIsProcessing(false);
-      setTranscript('Sample transcript text will appear here after recording implementation.');
-      setSummary('Meeting summary will be generated here.');
-    }, 2000);
   };
 
   const handleSaveTranscript = async () => {
@@ -147,9 +126,10 @@ function App() {
   };
 
   return (
-    <Box sx={{ flexGrow: 1 }}>
-      <AppBar position="static">
+    <Box sx={{ flexGrow: 1, bgcolor: '#f8f9fa', minHeight: '100vh' }}>
+      <AppBar position="static" elevation={0} sx={{ borderBottom: '1px solid rgba(0,0,0,0.1)' }}>
         <Toolbar>
+          <AudioIcon sx={{ mr: 2 }} />
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             Meeting Transcriber
           </Typography>
@@ -159,102 +139,128 @@ function App() {
         </Toolbar>
       </AppBar>
 
-      <Container maxWidth="lg" sx={{ mt: 4 }}>
+      <Container maxWidth="xl" sx={{ mt: 4 }}>
         {error && (
           <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
             {error}
           </Alert>
         )}
 
-        <Paper elevation={3} sx={{ mb: 3, p: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mb: 3 }}>
-            <Button
-              variant="contained"
-              size="large"
-              startIcon={isRecording ? <StopIcon /> : <MicIcon />}
-              onClick={isRecording ? handleStopRecording : handleStartRecording}
-              disabled={isProcessing}
-              color={isRecording ? 'error' : 'primary'}
-            >
-              {isRecording ? 'Stop Recording' : 'Start Recording'}
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<SaveIcon />}
-              onClick={handleSaveTranscript}
-              disabled={!transcript || isProcessing}
-            >
-              Save Transcript
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<FolderOpenIcon />}
-              onClick={handleOpenTranscript}
-              disabled={isRecording || isProcessing}
-            >
-              Open Transcript
-            </Button>
-          </Box>
+        <Grid container spacing={3}>
+          {/* Recording Controls Section */}
+          <Grid item xs={12} md={5}>
+            <RecordingControls />
 
-          {isProcessing && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
-              <CircularProgress />
-              <Typography sx={{ ml: 2 }}>Processing audio...</Typography>
+            {/* Action Buttons */}
+            <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
+              <Button
+                variant="outlined"
+                fullWidth
+                startIcon={<SaveIcon />}
+                onClick={handleSaveTranscript}
+                disabled={!transcript}
+              >
+                Save Transcript
+              </Button>
+              <Button
+                variant="outlined"
+                fullWidth
+                startIcon={<FolderOpenIcon />}
+                onClick={handleOpenTranscript}
+              >
+                Open Transcript
+              </Button>
             </Box>
-          )}
-        </Paper>
 
-        <Paper elevation={3}>
-          <Tabs value={tabValue} onChange={handleTabChange} sx={{ borderBottom: 1, borderColor: 'divider' }}>
-            <Tab label="Recording Status" />
-            <Tab label="Transcript" disabled={!transcript} />
-            <Tab label="Summary" disabled={!summary} />
-          </Tabs>
+            {/* API Key Status */}
+            <Box sx={{ mt: 3 }}>
+              {!apiKeys.assemblyai && (
+                <Alert severity="warning" sx={{ mb: 1 }}>
+                  AssemblyAI API key not configured
+                </Alert>
+              )}
+              {!apiKeys.openai && (
+                <Alert severity="warning">
+                  OpenAI API key not configured
+                </Alert>
+              )}
+              {apiKeys.assemblyai && apiKeys.openai && (
+                <Alert severity="success">
+                  All API keys configured
+                </Alert>
+              )}
+            </Box>
+          </Grid>
 
-          <TabPanel value={tabValue} index={0}>
-            <Typography variant="h6" gutterBottom>
-              Recording Status
-            </Typography>
-            <Typography>
-              {isRecording ? 'Recording in progress...' :
-               isProcessing ? 'Processing audio...' :
-               transcript ? 'Recording complete and processed.' :
-               'Ready to record. Click "Start Recording" to begin.'}
-            </Typography>
-            {!apiKeys.assemblyai && (
-              <Alert severity="warning" sx={{ mt: 2 }}>
-                AssemblyAI API key not configured. Please add it to your .env file.
-              </Alert>
-            )}
-            {!apiKeys.openai && (
-              <Alert severity="warning" sx={{ mt: 2 }}>
-                OpenAI API key not configured. Please add it to your .env file.
-              </Alert>
-            )}
-          </TabPanel>
+          {/* Transcript and Summary Section */}
+          <Grid item xs={12} md={7}>
+            <Paper elevation={0} sx={{ border: '1px solid rgba(0,0,0,0.1)', borderRadius: 2 }}>
+              <Tabs value={tabValue} onChange={handleTabChange} sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                <Tab label="Recording Info" />
+                <Tab label="Transcript" disabled={!transcript} />
+                <Tab label="Summary" disabled={!summary} />
+              </Tabs>
 
-          <TabPanel value={tabValue} index={1}>
-            <Typography variant="h6" gutterBottom>
-              Transcript
-            </Typography>
-            <Paper variant="outlined" sx={{ p: 2, minHeight: 300 }}>
-              <Typography style={{ whiteSpace: 'pre-wrap' }}>
-                {transcript || 'No transcript available'}
-              </Typography>
+              <TabPanel value={tabValue} index={0}>
+                <Box sx={{ p: 2 }}>
+                  <Typography variant="h6" gutterBottom>
+                    Recording Information
+                  </Typography>
+                  <Typography color="text.secondary" paragraph>
+                    This application allows you to record both microphone and system audio simultaneously.
+                  </Typography>
+                  <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
+                    Features:
+                  </Typography>
+                  <ul style={{ marginLeft: '20px', color: '#666' }}>
+                    <li>Record microphone, system audio, or both</li>
+                    <li>Real-time waveform visualization</li>
+                    <li>Volume level monitoring</li>
+                    <li>Pause and resume recording</li>
+                    <li>Automatic transcription with AssemblyAI</li>
+                    <li>AI-powered summarization with OpenAI</li>
+                  </ul>
+                  <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
+                    Instructions:
+                  </Typography>
+                  <ol style={{ marginLeft: '20px', color: '#666' }}>
+                    <li>Select your audio source (mic, system, or both)</li>
+                    <li>Choose your microphone if recording mic audio</li>
+                    <li>Click the record button to start</li>
+                    <li>Recording will be saved automatically</li>
+                    <li>Transcription will begin after recording stops</li>
+                  </ol>
+                </Box>
+              </TabPanel>
+
+              <TabPanel value={tabValue} index={1}>
+                <Box sx={{ p: 2, minHeight: 400 }}>
+                  <Typography variant="h6" gutterBottom>
+                    Transcript
+                  </Typography>
+                  <Paper variant="outlined" sx={{ p: 2, minHeight: 300, bgcolor: '#fafafa' }}>
+                    <Typography style={{ whiteSpace: 'pre-wrap' }}>
+                      {transcript || 'No transcript available. Record audio to generate a transcript.'}
+                    </Typography>
+                  </Paper>
+                </Box>
+              </TabPanel>
+
+              <TabPanel value={tabValue} index={2}>
+                <Box sx={{ p: 2, minHeight: 400 }}>
+                  <Typography variant="h6" gutterBottom>
+                    Summary
+                  </Typography>
+                  <Paper variant="outlined" sx={{ p: 2, minHeight: 300, bgcolor: '#fafafa' }}>
+                    <Typography style={{ whiteSpace: 'pre-wrap' }}>
+                      {summary || 'No summary available. A summary will be generated after transcription.'}
+                    </Typography>
+                  </Paper>
+                </Box>
+              </TabPanel>
             </Paper>
-          </TabPanel>
-
-          <TabPanel value={tabValue} index={2}>
-            <Typography variant="h6" gutterBottom>
-              Summary
-            </Typography>
-            <Paper variant="outlined" sx={{ p: 2, minHeight: 300 }}>
-              <Typography style={{ whiteSpace: 'pre-wrap' }}>
-                {summary || 'No summary available'}
-              </Typography>
-            </Paper>
-          </TabPanel>
-        </Paper>
+          </Grid>
+        </Grid>
       </Container>
     </Box>
   );

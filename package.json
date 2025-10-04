@@ -12,7 +12,13 @@
     "dist": "vite build && electron-builder",
     "dist:win": "vite build && electron-builder --win"
   },
-  "keywords": ["electron", "react", "typescript", "transcription", "meeting"],
+  "keywords": [
+    "electron",
+    "react",
+    "typescript",
+    "transcription",
+    "meeting"
+  ],
   "author": "",
   "license": "ISC",
   "devDependencies": {
@@ -39,12 +45,17 @@
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.15.6",
     "@mui/material": "^5.15.6",
+    "@types/recordrtc": "^5.6.15",
     "axios": "^1.6.5",
     "dotenv": "^16.3.2",
+    "framer-motion": "^12.23.22",
     "openai": "^4.26.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.21.3"
+    "react-router-dom": "^6.21.3",
+    "recordrtc": "^5.6.2",
+    "wavesurfer-react": "^3.0.4",
+    "wavesurfer.js": "^7.11.0"
   },
   "build": {
     "appId": "com.meeting-transcriber.app",

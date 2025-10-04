@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, Menu, desktopCapturer } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs/promises';
@@ -175,6 +175,62 @@ ipcMain.handle('open-transcript', async () => {
   } catch (error) {
     console.error('Error opening transcript:', error);
     return { success: false, error: (error as Error).message };
+  }
+});
+
+// Desktop audio capture handlers
+ipcMain.handle('get-desktop-sources', async () => {
+  try {
+    const sources = await desktopCapturer.getSources({
+      types: ['window', 'screen'],
+      fetchWindowIcons: true
+    });
+
+    return sources.map(source => ({
+      id: source.id,
+      name: source.name,
+      thumbnail: source.thumbnail.toDataURL()
+    }));
+  } catch (error) {
+    console.error('Error getting desktop sources:', error);
+    return [];
+  }
+});
+
+ipcMain.handle('save-recording', async (_, data: { filename: string; buffer: ArrayBuffer }) => {
+  try {
+    const { filePath } = await dialog.showSaveDialog({
+      defaultPath: data.filename,
+      filters: [
+        { name: 'WAV Files', extensions: ['wav'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    });
+
+    if (filePath) {
+      const buffer = Buffer.from(data.buffer);
+      await fs.writeFile(filePath, buffer);
+      return { success: true, path: filePath };
+    }
+    return { success: false, cancelled: true };
+  } catch (error) {
+    console.error('Error saving recording:', error);
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('get-app-path', async (_, type: string) => {
+  switch (type) {
+    case 'userData':
+      return app.getPath('userData');
+    case 'temp':
+      return app.getPath('temp');
+    case 'recordings':
+      const recordingsPath = path.join(app.getPath('userData'), 'recordings');
+      await fs.mkdir(recordingsPath, { recursive: true });
+      return recordingsPath;
+    default:
+      return app.getPath('userData');
   }
 });
 
