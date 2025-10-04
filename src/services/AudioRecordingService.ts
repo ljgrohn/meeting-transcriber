@@ -48,27 +48,46 @@ export class AudioRecordingService {
   }
 
   async getSystemAudioSources(): Promise<any[]> {
-    if (window.electronAPI && (window.electronAPI as any).getDesktopSources) {
-      return await (window.electronAPI as any).getDesktopSources();
+    if (window.electronAPI && window.electronAPI.getDesktopSources) {
+      return await window.electronAPI.getDesktopSources();
     }
     return [];
   }
 
   private async setupMicrophoneStream(deviceId?: string): Promise<MediaStream> {
-    const constraints: MediaStreamConstraints = {
-      audio: deviceId ? { deviceId: { exact: deviceId } } : true,
-      video: false
-    };
+    try {
+      const constraints: MediaStreamConstraints = {
+        audio: deviceId ? { deviceId: { exact: deviceId } } : true,
+        video: false
+      };
 
-    return await navigator.mediaDevices.getUserMedia(constraints);
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      return stream;
+    } catch (error: any) {
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        throw new Error('Microphone permission denied. Please allow microphone access and try again.');
+      } else if (error.name === 'NotFoundError') {
+        throw new Error('No microphone found. Please connect a microphone and try again.');
+      } else {
+        throw new Error(`Failed to access microphone: ${error.message}`);
+      }
+    }
   }
 
   private async setupSystemAudioStream(sourceId?: string): Promise<MediaStream> {
-    if (!window.electronAPI || !(window.electronAPI as any).getDesktopStream) {
+    if (!sourceId) {
+      throw new Error('Please select a window or screen to record audio from');
+    }
+
+    if (!window.electronAPI || !window.electronAPI.getDesktopStream) {
       throw new Error('System audio capture not available');
     }
 
-    return await (window.electronAPI as any).getDesktopStream(sourceId);
+    try {
+      return await window.electronAPI.getDesktopStream(sourceId);
+    } catch (error: any) {
+      throw new Error(`Failed to capture system audio: ${error.message}`);
+    }
   }
 
   private setupAudioAnalysers(stream: MediaStream, type: 'microphone' | 'system'): AnalyserNode {

@@ -15,6 +15,8 @@ import {
   Fade,
   CircularProgress,
   SelectChangeEvent,
+  Alert,
+  Snackbar,
 } from '@mui/material';
 import {
   FiberManualRecord as RecordIcon,
@@ -29,6 +31,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import AudioVisualizer from './AudioVisualizer';
 import VolumeLevelIndicator from './VolumeLevelIndicator';
+import SystemAudioSelector from './SystemAudioSelector';
 import { AudioRecordingService } from '../services/AudioRecordingService';
 import { AudioSource, AudioDevice, AudioLevels } from '../types/audio';
 
@@ -38,10 +41,14 @@ const RecordingControls: React.FC = () => {
   const [duration, setDuration] = useState(0);
   const [audioSource, setAudioSource] = useState<AudioSource>('both');
   const [selectedMicrophone, setSelectedMicrophone] = useState<string>('');
+  const [selectedSystemSource, setSelectedSystemSource] = useState<string>('');
   const [microphones, setMicrophones] = useState<AudioDevice[]>([]);
   const [audioLevels, setAudioLevels] = useState<AudioLevels>({ microphone: 0, system: 0 });
   const [waveformData, setWaveformData] = useState<Float32Array | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showSystemSelector, setShowSystemSelector] = useState(false);
+  const [error, setError] = useState<string>('');
+  const [showError, setShowError] = useState(false);
 
   const recordingService = useRef<AudioRecordingService>(new AudioRecordingService());
   const durationInterval = useRef<NodeJS.Timeout | null>(null);
@@ -86,12 +93,21 @@ const RecordingControls: React.FC = () => {
   };
 
   const handleStartRecording = async () => {
+    // Check if system audio is selected and no source is chosen
+    if ((audioSource === 'system' || audioSource === 'both') && !selectedSystemSource) {
+      setShowSystemSelector(true);
+      return;
+    }
+
     setIsLoading(true);
+    setError('');
+    setShowError(false);
+
     try {
       await recordingService.current.startRecording(
         audioSource,
         audioSource !== 'system' ? selectedMicrophone : undefined,
-        undefined // System source ID - can be enhanced to allow selection
+        audioSource !== 'microphone' ? selectedSystemSource : undefined
       );
 
       setIsRecording(true);
@@ -102,11 +118,19 @@ const RecordingControls: React.FC = () => {
       durationInterval.current = setInterval(() => {
         setDuration(recordingService.current.getCurrentDuration());
       }, 100);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error starting recording:', error);
-      alert('Failed to start recording. Please check your microphone permissions.');
+      setError(error.message || 'Failed to start recording');
+      setShowError(true);
     }
     setIsLoading(false);
+  };
+
+  const handleSystemSourceSelected = async (sourceId: string) => {
+    setSelectedSystemSource(sourceId);
+    setShowSystemSelector(false);
+    // Start recording after source selection
+    setTimeout(() => handleStartRecording(), 100);
   };
 
   const handleStopRecording = async () => {
@@ -160,6 +184,10 @@ const RecordingControls: React.FC = () => {
   const handleAudioSourceChange = (_: React.MouseEvent<HTMLElement>, newSource: AudioSource | null) => {
     if (newSource && !isRecording) {
       setAudioSource(newSource);
+      // Reset system source when changing audio source
+      if (newSource === 'microphone') {
+        setSelectedSystemSource('');
+      }
     }
   };
 
@@ -403,6 +431,29 @@ const RecordingControls: React.FC = () => {
           </Fade>
         )}
       </Box>
+
+      {/* System Audio Source Selector Dialog */}
+      <SystemAudioSelector
+        open={showSystemSelector}
+        onClose={() => setShowSystemSelector(false)}
+        onSelectSource={handleSystemSourceSelected}
+      />
+
+      {/* Error Snackbar */}
+      <Snackbar
+        open={showError}
+        autoHideDuration={6000}
+        onClose={() => setShowError(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setShowError(false)}
+          severity="error"
+          sx={{ width: '100%' }}
+        >
+          {error}
+        </Alert>
+      </Snackbar>
     </Paper>
   );
 };
