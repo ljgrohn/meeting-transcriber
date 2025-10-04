@@ -80,13 +80,27 @@ export class AudioRecordingService {
     }
 
     if (!window.electronAPI || !window.electronAPI.getDesktopStream) {
-      throw new Error('System audio capture not available');
+      throw new Error('System audio capture not available in this environment');
     }
 
     try {
-      return await window.electronAPI.getDesktopStream(sourceId);
+      const stream = await window.electronAPI.getDesktopStream(sourceId);
+
+      // Validate that we got a proper MediaStream
+      if (!stream || !(stream instanceof MediaStream)) {
+        throw new Error('Invalid stream returned from system audio capture');
+      }
+
+      // Check if stream has audio tracks
+      const audioTracks = stream.getAudioTracks();
+      if (audioTracks.length === 0) {
+        throw new Error('No audio tracks available from the selected source');
+      }
+
+      return stream;
     } catch (error: any) {
-      throw new Error(`Failed to capture system audio: ${error.message}`);
+      console.error('System audio capture error:', error);
+      throw new Error(error.message || 'Failed to capture system audio');
     }
   }
 
@@ -190,11 +204,17 @@ export class AudioRecordingService {
       // Setup audio streams based on source
       if (audioSource === 'microphone' || audioSource === 'both') {
         this.microphoneStream = await this.setupMicrophoneStream(microphoneId);
+        if (!this.microphoneStream || !(this.microphoneStream instanceof MediaStream)) {
+          throw new Error('Failed to setup microphone stream');
+        }
         this.setupAudioAnalysers(this.microphoneStream, 'microphone');
       }
 
       if (audioSource === 'system' || audioSource === 'both') {
         this.systemAudioStream = await this.setupSystemAudioStream(systemSourceId);
+        if (!this.systemAudioStream || !(this.systemAudioStream instanceof MediaStream)) {
+          throw new Error('Failed to setup system audio stream. System audio may not be available.');
+        }
         this.setupAudioAnalysers(this.systemAudioStream, 'system');
       }
 
@@ -207,7 +227,7 @@ export class AudioRecordingService {
           : this.systemAudioStream;
       }
 
-      if (!this.combinedStream) {
+      if (!this.combinedStream || !(this.combinedStream instanceof MediaStream)) {
         throw new Error('Failed to setup audio stream');
       }
 
@@ -265,16 +285,16 @@ export class AudioRecordingService {
       this.animationFrameId = null;
     }
 
-    // Stop all tracks
-    if (this.microphoneStream) {
+    // Stop all tracks - check that getTracks exists before calling it
+    if (this.microphoneStream && typeof this.microphoneStream.getTracks === 'function') {
       this.microphoneStream.getTracks().forEach(track => track.stop());
       this.microphoneStream = null;
     }
-    if (this.systemAudioStream) {
+    if (this.systemAudioStream && typeof this.systemAudioStream.getTracks === 'function') {
       this.systemAudioStream.getTracks().forEach(track => track.stop());
       this.systemAudioStream = null;
     }
-    if (this.combinedStream) {
+    if (this.combinedStream && typeof this.combinedStream.getTracks === 'function') {
       this.combinedStream.getTracks().forEach(track => track.stop());
       this.combinedStream = null;
     }
