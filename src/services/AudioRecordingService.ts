@@ -19,11 +19,31 @@ export class AudioRecordingService {
   private pausedDuration: number = 0;
 
   constructor() {
-    this.initializeAudioContext();
+    // Don't initialize audio context in constructor - wait until needed
   }
 
-  private initializeAudioContext() {
-    this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+  private async initializeAudioContext() {
+    if (this.audioContext) {
+      // Already initialized
+      return;
+    }
+
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) {
+        throw new Error('Web Audio API not supported in this browser');
+      }
+
+      this.audioContext = new AudioContextClass();
+
+      // Resume audio context if it's suspended (Chrome autoplay policy)
+      if (this.audioContext.state === 'suspended') {
+        await this.audioContext.resume();
+      }
+    } catch (error) {
+      console.error('Failed to initialize audio context:', error);
+      throw new Error('Failed to initialize audio system');
+    }
   }
 
   async getAvailableMicrophones(): Promise<AudioDevice[]> {
@@ -104,8 +124,13 @@ export class AudioRecordingService {
     }
   }
 
-  private setupAudioAnalysers(stream: MediaStream, type: 'microphone' | 'system'): AnalyserNode {
-    if (!this.audioContext) throw new Error('Audio context not initialized');
+  private async setupAudioAnalysers(stream: MediaStream, type: 'microphone' | 'system'): Promise<AnalyserNode> {
+    // Ensure audio context is initialized
+    await this.initializeAudioContext();
+
+    if (!this.audioContext) {
+      throw new Error('Audio context not initialized');
+    }
 
     const source = this.audioContext.createMediaStreamSource(stream);
     const analyser = this.audioContext.createAnalyser();
@@ -128,8 +153,13 @@ export class AudioRecordingService {
     return analyser;
   }
 
-  private mergeAudioStreams(): MediaStream {
-    if (!this.audioContext) throw new Error('Audio context not initialized');
+  private async mergeAudioStreams(): Promise<MediaStream> {
+    // Ensure audio context is initialized
+    await this.initializeAudioContext();
+
+    if (!this.audioContext) {
+      throw new Error('Audio context not initialized');
+    }
 
     this.destination = this.audioContext.createMediaStreamDestination();
 
@@ -198,6 +228,9 @@ export class AudioRecordingService {
     systemSourceId?: string
   ): Promise<void> {
     try {
+      // Initialize audio context first
+      await this.initializeAudioContext();
+
       this.startTime = Date.now();
       this.pausedDuration = 0;
 
@@ -207,7 +240,7 @@ export class AudioRecordingService {
         if (!this.microphoneStream || !(this.microphoneStream instanceof MediaStream)) {
           throw new Error('Failed to setup microphone stream');
         }
-        this.setupAudioAnalysers(this.microphoneStream, 'microphone');
+        await this.setupAudioAnalysers(this.microphoneStream, 'microphone');
       }
 
       if (audioSource === 'system' || audioSource === 'both') {
@@ -215,12 +248,12 @@ export class AudioRecordingService {
         if (!this.systemAudioStream || !(this.systemAudioStream instanceof MediaStream)) {
           throw new Error('Failed to setup system audio stream. System audio may not be available.');
         }
-        this.setupAudioAnalysers(this.systemAudioStream, 'system');
+        await this.setupAudioAnalysers(this.systemAudioStream, 'system');
       }
 
       // Merge streams if both are selected
       if (audioSource === 'both') {
-        this.combinedStream = this.mergeAudioStreams();
+        this.combinedStream = await this.mergeAudioStreams();
       } else {
         this.combinedStream = audioSource === 'microphone'
           ? this.microphoneStream
@@ -341,10 +374,14 @@ export class AudioRecordingService {
     return this.recorder?.getState() || 'inactive';
   }
 
-  destroy() {
+  async destroy() {
     this.cleanup();
     if (this.audioContext) {
-      this.audioContext.close();
+      try {
+        await this.audioContext.close();
+      } catch (error) {
+        console.error('Error closing audio context:', error);
+      }
       this.audioContext = null;
     }
   }

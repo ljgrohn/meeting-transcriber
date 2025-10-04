@@ -59,7 +59,8 @@ const RecordingControls: React.FC = () => {
 
     return () => {
       if (recordingService.current) {
-        recordingService.current.destroy();
+        // Call destroy but don't await (cleanup happens synchronously)
+        recordingService.current.destroy().catch(console.error);
       }
       if (durationInterval.current) {
         clearInterval(durationInterval.current);
