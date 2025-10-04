@@ -1,13 +1,10 @@
-import { app, BrowserWindow, ipcMain, dialog, Menu, desktopCapturer } from 'electron';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import fs from 'node:fs/promises';
-import dotenv from 'dotenv';
+const { app, BrowserWindow, ipcMain, dialog, Menu, desktopCapturer } = require('electron');
+const path = require('path');
+const fs = require('fs').promises;
+const dotenv = require('dotenv');
 
 // Load environment variables
 dotenv.config();
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -95,11 +92,15 @@ const createWindow = () => {
   Menu.setApplicationMenu(menu);
 
   // Load the app
-  if (process.env.VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
+  const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+
+  if (isDev) {
+    // In development, load from Vite dev server
+    mainWindow.loadURL('http://localhost:5173');
     // Open the DevTools in development
     mainWindow.webContents.openDevTools();
   } else {
+    // In production, load the built files
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 
